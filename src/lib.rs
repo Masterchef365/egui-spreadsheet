@@ -52,26 +52,19 @@ impl SpreadSheetWidget {
     }
 }
 
-/*
-
-impl Default for Spreadsheet {
-    fn default() -> Self {
-        Self {
-            dimension: (3, 3),
-            size: Vec2::splat(200.),
-            id_salt: None,
-        }
-    }
-}
-*/
-
 #[derive(Default, Clone)]
-struct SpreadsheetWidths {
+pub struct SpreadsheetWidths {
+    default_width: f32,
     widths: Vec<f32>,
     accum: Vec<f32>,
 }
 
 impl SpreadsheetWidths {
+    pub fn get_width(&mut self, idx: usize) -> f32 {
+        self.widths.resize(idx+1, self.default_width);
+        self.widths[idx]
+    }
+
     pub fn set_width(&mut self, idx: usize, width: f32) {
         self.widths[idx] = width;
         self.rebuild_accum();
