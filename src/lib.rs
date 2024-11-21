@@ -62,7 +62,9 @@ impl SpreadSheetWidget {
         // Synchronize the width numbering
         let (cols, rows) = self.dimension;
         meta.row_heights.set_len(rows);
+        meta.row_heights.rebuild_accum();
         meta.column_widths.set_len(cols);
+        meta.column_widths.rebuild_accum();
 
         // Widget setup
         let resp = ui.allocate_response(meta.total_internal_size(), Sense::click_and_drag());
@@ -79,16 +81,15 @@ impl SpreadSheetWidget {
 
         // Draw the background
 
-
         // Draw the contents of the cells
         let (min_j, max_j) = meta.row_heights.range(view_rect.min.y, view_rect.max.y);
         let (min_i, max_i) = meta.column_widths.range(view_rect.min.x, view_rect.max.x);
         for j in min_j..max_j {
-            let y_offset = meta.row_heights.accum[j];
-            let y_height = meta.row_heights.widths[j];
+            let y_offset = meta.row_heights.get_accum(j).unwrap();
+            let y_height = meta.row_heights.get_width(j).unwrap();
             for i in min_i..max_i {
-                let x_offset = meta.column_widths.accum[i];
-                let x_width = meta.column_widths.widths[i];
+                let x_offset = meta.column_widths.get_accum(i).unwrap();
+                let x_width = meta.column_widths.get_width(i).unwrap();
 
                 let coord = (i, j);
 
@@ -146,13 +147,19 @@ impl SpreadsheetWidths {
         self.widths.resize(len, self.default_width);
     }
 
+    pub fn get_accum(&self, idx: usize) -> Option<f32> {
+        match idx.checked_sub(1) {
+            Some(true_idx) => self.accum.get(true_idx).copied(),
+            None => Some(0.0),
+        }
+    }
+
     pub fn get_width(&self, idx: usize) -> Option<f32> {
         self.widths.get(idx).copied()
     }
 
     pub fn set_width(&mut self, idx: usize, width: f32) {
         self.widths[idx] = width;
-        self.rebuild_accum();
     }
 
     pub fn rebuild_accum(&mut self) {
@@ -171,7 +178,6 @@ impl SpreadsheetWidths {
     }
 
     pub fn range(&mut self, min: f32, max: f32) -> (usize, usize) {
-        self.rebuild_accum();
         (
             binary_search_sorted(&self.accum, min)
                 .checked_sub(1)
@@ -187,13 +193,13 @@ impl Default for SpreadsheetMetadata {
         Self {
             cursor: None,
             column_widths: SpreadsheetWidths::new(200.0),
-            row_heights: SpreadsheetWidths::new(10.0),
+            row_heights: SpreadsheetWidths::new(20.0),
         }
     }
 }
 
 fn binary_search_sorted(arr: &[f32], x: f32) -> usize {
     match arr.binary_search_by(|a| a.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal)) {
-        Err(x) | Ok(x) => x,
+        Err(idx) | Ok(idx) => idx,
     }
 }
