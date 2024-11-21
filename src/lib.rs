@@ -1,4 +1,4 @@
-use egui::{Id, Pos2, Rect, ScrollArea, Sense, Ui, UiBuilder, Vec2, Widget};
+use egui::{Id, Pos2, Rect, ScrollArea, Sense, Stroke, Ui, UiBuilder, Vec2, Widget};
 
 #[derive(Clone)]
 pub struct SpreadSheetWidget {
@@ -64,7 +64,12 @@ impl SpreadSheetWidget {
         meta.row_heights.set_len(rows);
         meta.column_widths.set_len(cols);
 
+        // Widget setup
         let resp = ui.allocate_response(meta.total_internal_size(), Sense::click_and_drag());
+
+        if cols * rows == 0 {
+            return resp;
+        }
 
         let view_rect = self
             .show_area
@@ -72,12 +77,16 @@ impl SpreadSheetWidget {
 
         let parent_id = ui.next_auto_id();
 
+        // Draw the background
+
+
+        // Draw the contents of the cells
         let (min_j, max_j) = meta.row_heights.range(view_rect.min.y, view_rect.max.y);
         let (min_i, max_i) = meta.column_widths.range(view_rect.min.x, view_rect.max.x);
-        for j in min_j..=max_j {
+        for j in min_j..max_j {
             let y_offset = meta.row_heights.accum[j];
             let y_height = meta.row_heights.widths[j];
-            for i in min_i..=max_i {
+            for i in min_i..max_i {
                 let x_offset = meta.column_widths.accum[i];
                 let x_width = meta.column_widths.widths[i];
 
@@ -166,7 +175,8 @@ impl SpreadsheetWidths {
             binary_search_sorted(&self.accum, min)
                 .checked_sub(1)
                 .unwrap_or(0),
-            (binary_search_sorted(&self.accum, max) + 1).min(self.accum.len() - 1),
+            (binary_search_sorted(&self.accum, max) + 1)
+                .min(self.accum.len().checked_sub(1).unwrap_or(0)),
         )
     }
 }
