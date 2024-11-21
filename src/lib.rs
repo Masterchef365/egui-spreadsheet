@@ -170,7 +170,8 @@ impl SpreadsheetWidths {
         self.accum.last().copied().unwrap_or(0.0)
     }
 
-    pub fn range(&self, min: f32, max: f32) -> (usize, usize) {
+    pub fn range(&mut self, min: f32, max: f32) -> (usize, usize) {
+        self.rebuild_accum();
         (
             binary_search_sorted(&self.accum, min)
                 .checked_sub(1)
