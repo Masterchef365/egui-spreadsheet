@@ -1,17 +1,32 @@
-use egui::{Color32, Id, Pos2, Rect, ScrollArea, Sense, Stroke, Ui, UiBuilder, Vec2, Widget};
+use egui::{Id, Rect, Sense, Stroke, Ui, UiBuilder, Vec2};
+
+#[derive(Clone, Copy)]
+pub struct WidthPreferences {
+    pub resizeable: bool,
+    pub default: f32,
+}
 
 #[derive(Clone)]
 pub struct SpreadSheetWidget {
     dimension: (usize, usize),
     show_area: Option<Rect>,
+    line_color: Option<Stroke>,
     id_salt: Option<Id>,
+    column_width: WidthPreferences,
+    row_height: WidthPreferences,
 }
 
 #[derive(Clone)]
 pub struct SpreadsheetMetadata {
     pub cursor: Option<(usize, usize)>,
-    pub column_widths: SpreadsheetWidths,
-    pub row_heights: SpreadsheetWidths,
+    pub column_widths: ColumnWidths,
+    pub row_heights: ColumnWidths,
+}
+
+#[derive(Clone)]
+enum ColumnWidths {
+    Constant { width: f32, n: usize },
+    Variable(VariableColumnWidths),
 }
 
 impl SpreadsheetMetadata {
@@ -45,11 +60,30 @@ impl SpreadSheetWidget {
             dimension: (cols, rows),
             show_area: None,
             id_salt: None,
+            line_color: None,
+            column_width: WidthPreferences {
+                resizeable: true,
+                default: 200.0,
+            },
+            row_height: WidthPreferences {
+                resizeable: true,
+                default: 20.0,
+            },
         }
     }
 
     pub fn show_area(mut self, area: Rect) -> Self {
         self.show_area = Some(area);
+        self
+    }
+
+    pub fn column_width(mut self, cfg: WidthPreferences) -> Self {
+        self.column_width = cfg;
+        self
+    }
+
+    pub fn row_height(mut self, cfg: WidthPreferences) -> Self {
+        self.row_height = cfg;
         self
     }
 
@@ -62,9 +96,26 @@ impl SpreadSheetWidget {
         // Synchronize the width numbering
         let (cols, rows) = self.dimension;
         meta.row_heights.set_len(rows);
-        meta.row_heights.rebuild_accum();
         meta.column_widths.set_len(cols);
-        meta.column_widths.rebuild_accum();
+
+        // Synchronize width preferences
+        fn sync_column_and_width(pref: &WidthPreferences, column: &mut ColumnWidths) {
+            if pref.resizeable {
+                if matches!(column, ColumnWidths::Variable(_)) {
+                    *column = ColumnWidths::Constant {
+                        width: column.get_width(0).unwrap_or(pref.default),
+                        n: column.len(),
+                    }
+                }
+            } else {
+                if matches!(column, ColumnWidths::Constant { .. }) {
+                    *column = ColumnWidths::Variable(VariableColumnWidths::new(pref.default));
+                }
+            }
+        }
+
+        sync_column_and_width(&self.column_width, &mut meta.column_widths);
+        sync_column_and_width(&self.row_height, &mut meta.row_heights);
 
         // Widget setup
         let resp = ui.allocate_response(meta.total_internal_size(), Sense::click_and_drag());
@@ -80,24 +131,32 @@ impl SpreadSheetWidget {
         let parent_id = ui.next_auto_id();
 
         // Draw the background
-        let line_color = Stroke::new(1., Color32::WHITE);
+        let line_color = self
+            .line_color
+            .unwrap_or(Stroke::new(1., ui.style().visuals.weak_text_color()));
 
-        let paint = ui.painter();//_at(view_rect);
+        let paint = ui.painter(); //_at(view_rect);
 
         let (min_j, max_j) = meta.row_heights.range(view_rect.min.y, view_rect.max.y);
         let (min_i, max_i) = meta.column_widths.range(view_rect.min.x, view_rect.max.x);
         for j in min_j..=max_j {
             let y_offset = meta.row_heights.get_accum(j).unwrap();
 
-            paint
-                .hline(resp.rect.min.x..=resp.rect.max.x, y_offset - view_rect.min.y, line_color);
+            paint.hline(
+                resp.rect.min.x..=resp.rect.max.x,
+                y_offset - view_rect.min.y,
+                line_color,
+            );
         }
 
         for i in min_i..=max_i {
             let x_offset = meta.column_widths.get_accum(i).unwrap();
 
-            paint
-                .vline(x_offset - view_rect.min.x, resp.rect.min.y..=resp.rect.max.y, line_color);
+            paint.vline(
+                x_offset - view_rect.min.x,
+                resp.rect.min.y..=resp.rect.max.y,
+                line_color,
+            );
         }
 
         // Draw the contents of the cells
@@ -145,13 +204,13 @@ impl SpreadSheetWidget {
 }
 
 #[derive(Clone)]
-pub struct SpreadsheetWidths {
+pub struct VariableColumnWidths {
     default_width: f32,
     widths: Vec<f32>,
     accum: Vec<f32>,
 }
 
-impl SpreadsheetWidths {
+impl VariableColumnWidths {
     pub fn new(default_width: f32) -> Self {
         Self {
             default_width,
@@ -160,8 +219,13 @@ impl SpreadsheetWidths {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.widths.len()
+    }
+
     pub fn set_len(&mut self, len: usize) {
         self.widths.resize(len, self.default_width);
+        self.rebuild_accum();
     }
 
     pub fn get_accum(&self, idx: usize) -> Option<f32> {
@@ -209,8 +273,8 @@ impl Default for SpreadsheetMetadata {
     fn default() -> Self {
         Self {
             cursor: None,
-            column_widths: SpreadsheetWidths::new(200.0),
-            row_heights: SpreadsheetWidths::new(20.0),
+            column_widths: ColumnWidths::Constant { width: 200.0, n: 0 },
+            row_heights: ColumnWidths::Constant { width: 20.0, n: 0 },
         }
     }
 }
@@ -218,5 +282,51 @@ impl Default for SpreadsheetMetadata {
 fn binary_search_sorted(arr: &[f32], x: f32) -> usize {
     match arr.binary_search_by(|a| a.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal)) {
         Err(idx) | Ok(idx) => idx,
+    }
+}
+
+impl ColumnWidths {
+    pub fn get_width(&self, idx: usize) -> Option<f32> {
+        match self {
+            ColumnWidths::Constant { width, .. } => Some(*width),
+            ColumnWidths::Variable(var) => var.get_width(idx),
+        }
+    }
+
+    pub fn set_len(&mut self, len: usize) {
+        match self {
+            ColumnWidths::Variable(var) => var.set_len(len),
+            ColumnWidths::Constant { n, .. } => *n = len,
+        }
+    }
+
+    pub fn get_accum(&self, idx: usize) -> Option<f32> {
+        match self {
+            ColumnWidths::Variable(var) => var.get_accum(idx),
+            ColumnWidths::Constant { width, .. } => Some(width * idx as f32),
+        }
+    }
+
+    pub fn total_width(&self) -> f32 {
+        match self {
+            ColumnWidths::Variable(var) => var.total_width(),
+            ColumnWidths::Constant { width, n } => *width * *n as f32,
+        }
+    }
+
+    pub fn range(&mut self, min: f32, max: f32) -> (usize, usize) {
+        match self {
+            ColumnWidths::Variable(var) => var.range(min, max),
+            ColumnWidths::Constant { width, .. } => {
+                ((min / *width) as usize, (max / *width) as usize)
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            ColumnWidths::Variable(var) => var.len(),
+            ColumnWidths::Constant { n, .. } => *n,
+        }
     }
 }
