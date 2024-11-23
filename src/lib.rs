@@ -318,7 +318,7 @@ impl ColumnWidths {
         match self {
             ColumnWidths::Variable(var) => var.range(min, max),
             ColumnWidths::Constant { width, .. } => {
-                ((min / *width) as usize, (max / *width) as usize)
+                ((min / *width) as usize, (max / *width) as usize + 1)
             }
         }
     }
