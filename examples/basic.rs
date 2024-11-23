@@ -4,6 +4,7 @@ use egui_spreadsheet::SpreadSheetWidget;
 fn main() {
     eframe::run_simple_native("Demo Sheet", Default::default(), move |ctx, _frame| {
         CentralPanel::default().show(ctx, |ui| {
+            ui.label("This is a spreadsheet widget:");
             ScrollArea::both().show_viewport(ui, |ui, viewport| {
                 SpreadSheetWidget::new(10, 10)
                     .show_area(viewport)

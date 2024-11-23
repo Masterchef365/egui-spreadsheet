@@ -1,4 +1,4 @@
-use egui::{Id, Pos2, Rect, ScrollArea, Sense, Stroke, Ui, UiBuilder, Vec2, Widget};
+use egui::{Color32, Id, Pos2, Rect, ScrollArea, Sense, Stroke, Ui, UiBuilder, Vec2, Widget};
 
 #[derive(Clone)]
 pub struct SpreadSheetWidget {
@@ -80,10 +80,27 @@ impl SpreadSheetWidget {
         let parent_id = ui.next_auto_id();
 
         // Draw the background
+        let line_color = Stroke::new(1., Color32::WHITE);
 
-        // Draw the contents of the cells
+        let paint = ui.painter();//_at(view_rect);
+
         let (min_j, max_j) = meta.row_heights.range(view_rect.min.y, view_rect.max.y);
         let (min_i, max_i) = meta.column_widths.range(view_rect.min.x, view_rect.max.x);
+        for j in min_j..=max_j {
+            let y_offset = meta.row_heights.get_accum(j).unwrap();
+
+            paint
+                .hline(resp.rect.min.x..=resp.rect.max.x, y_offset - view_rect.min.y, line_color);
+        }
+
+        for i in min_i..=max_i {
+            let x_offset = meta.column_widths.get_accum(i).unwrap();
+
+            paint
+                .vline(x_offset - view_rect.min.x, resp.rect.min.y..=resp.rect.max.y, line_color);
+        }
+
+        // Draw the contents of the cells
         for j in min_j..max_j {
             let y_offset = meta.row_heights.get_accum(j).unwrap();
             let y_height = meta.row_heights.get_width(j).unwrap();
