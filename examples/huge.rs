@@ -8,7 +8,7 @@ fn main() {
             ScrollArea::both().show_viewport(ui, |ui, viewport| {
                 SpreadSheetWidget::new(1_000_000, 1_000_000)
                     .show_area(viewport)
-                    .show_persisted_meta(ui, |ui, (col, row)| {
+                    .show_persisted_meta(ui, |ui, (col, row), _rect| {
                         ui.label(format!("I'm a cell at ({col}, {row})"));
                     });
             });
