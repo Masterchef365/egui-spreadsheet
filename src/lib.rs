@@ -17,7 +17,7 @@ pub struct SpreadSheetWidget {
 }
 
 #[derive(Clone)]
-pub struct SpreadsheetMetadata {
+struct SpreadsheetMetadata {
     pub cursor: Option<(usize, usize)>,
     pub column_widths: ColumnWidths,
     pub row_heights: ColumnWidths,
@@ -67,7 +67,7 @@ impl SpreadSheetWidget {
             },
             row_height: WidthPreferences {
                 resizeable: true,
-                default: 20.0,
+                default: 25.0,
             },
         }
     }
@@ -91,7 +91,7 @@ impl SpreadSheetWidget {
         &mut self,
         ui: &mut Ui,
         meta: &mut SpreadsheetMetadata,
-        mut cell_func: impl FnMut(&mut Ui, (usize, usize)),
+        mut cell_func: impl FnMut(&mut Ui, (usize, usize), Rect),
     ) -> egui::Response {
         // Synchronize the width numbering
         let (cols, rows) = self.dimension;
@@ -178,7 +178,7 @@ impl SpreadSheetWidget {
                     .id_salt(parent_id.with(coord))
                     .max_rect(max_rect);
 
-                ui.allocate_new_ui(cfg, |ui| cell_func(ui, coord));
+                ui.allocate_new_ui(cfg, |ui| cell_func(ui, coord, max_rect));
             }
         }
 
@@ -189,7 +189,7 @@ impl SpreadSheetWidget {
     pub fn show_persisted_meta(
         &mut self,
         ui: &mut Ui,
-        cell_ui: impl FnMut(&mut Ui, (usize, usize)),
+        cell_ui: impl FnMut(&mut Ui, (usize, usize), Rect),
     ) -> egui::Response {
         let id: Id = ui.next_auto_id().with(self.id_salt);
         let mut meta = ui.memory_mut(|w| {
@@ -274,7 +274,7 @@ impl Default for SpreadsheetMetadata {
         Self {
             cursor: None,
             column_widths: ColumnWidths::Constant { width: 200.0, n: 0 },
-            row_heights: ColumnWidths::Constant { width: 20.0, n: 0 },
+            row_heights: ColumnWidths::Constant { width: 25.0, n: 0 },
         }
     }
 }
